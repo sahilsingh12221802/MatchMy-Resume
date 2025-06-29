@@ -1,12 +1,43 @@
-# React + Vite
+# MatchMy Resume - AI-Powered Resume Analysis Tool
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MatchMy Resume is a web application that analyzes your resume against a job description using AI (Google Gemini) to provide detailed matching insights, improvement suggestions, and ATS compatibility scores.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Resume Analysis**: Get a percentage match between your resume and job description
+- **Section-wise Breakdown**: Scores for skills, experience, education, and keywords
+- **ATS Compatibility**: Check how well your resume will perform with Applicant Tracking Systems
+- **Missing Keywords**: Identify important keywords from the job description missing in your resume
+- **Improvement Suggestions**: Get actionable feedback to strengthen your resume
+- **PDF Processing**: Directly upload and extract text from PDF resumes
+- **Interactive Editor**: Apply suggested changes directly to your resume text
 
-## Expanding the ESLint configuration
+## Technologies Used
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Frontend**: React 19, Vite
+- **Styling**: Tailwind CSS
+- **AI Integration**: Google Gemini API
+- **PDF Processing**: pdfjs-dist, pdf-lib
+- **File Upload**: react-dropzone
+- **Linting**: ESLint with React plugins
+- **Icons**: react-icons
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/matchmy-resume.git
+   cd matchmy-resume
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create a .env file in the root directory with your Gemini API key:
+   ```bash
+   VITE_GEMINI_API_KEY=your-api-key-here
+   ```
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
