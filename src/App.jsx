@@ -12,24 +12,30 @@ const App = () => {
   const [originalResumeText, setOriginalResumeText] = useState('');
 
   const extractJSON = (text) => {
+
     try {
-      let cleanText = text
-        .replace(/```/g, '')
-        .replace(/json\s*{/i, '{')
-        .trim();
-      
-      const jsonStart = cleanText.indexOf('{');
-      const jsonEnd = cleanText.lastIndexOf('}') + 1;
-      
-      if (jsonStart === -1 || jsonEnd === 0) {
-        throw new Error("No JSON found in response");
+      const directParse = JSON.parse(text);
+      if (directParse && typeof directParse === 'object') {
+        return directParse;
+      }
+    } catch (e) {}
+    try {
+      const compactText = text.replace(/\s+/g, ' ');
+      const jsonMarkdownMatch = compactText.match(/```(json)?\s*({.*?})\s*```/);
+      if (jsonMarkdownMatch && jsonMarkdownMatch[2]) {
+        return JSON.parse(jsonMarkdownMatch[2]);
       }
       
-      const jsonString = cleanText.substring(jsonStart, jsonEnd);
-      return JSON.parse(jsonString);
+      // Try to find standalone JSON object
+      const jsonMatch = compactText.match(/{.*?}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      
+      throw new Error("No valid JSON structure found in response");
     } catch (error) {
-      console.error("JSON extraction error:", error);
-      throw new Error(`Failed to parse JSON: ${error.message}`);
+      console.error("Full extraction error:", { error, text });
+      throw new Error(`Failed to extract JSON: ${error.message}. Received: "${text.substring(0, 100)}..."`);
     }
   };
 
@@ -39,8 +45,8 @@ const App = () => {
     setLoading(true);
     setAnalysis(null);
     setApiError('');
-    setOriginalResumeText(resumeText); // Store the original resume text
-    
+    setOriginalResumeText(resumeText);
+
     try {
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({ 
@@ -52,72 +58,83 @@ const App = () => {
         }
       });
 
-      const prompt = `Analyze this resume against the job description with:
-1. Exact match percentage (0-100)
-2. Score breakdown by section (skills, experience, education, keywords)
-3. ATS compatibility score (0-100)
-4. Missing keywords
-5. Specific improvement suggestions for each weak section
-6. Overall summary
+      const prompt = `ANALYSIS REQUEST:
+You are a professional resume analyzer. Analyze this resume against the provided job description and return ONLY a JSON object with the following structure:
 
-Return ONLY valid JSON format:
 {
-  "matchPercentage": number,
+  "matchPercentage": number (0-100),
   "scoreBreakdown": {
-    "skills": number,
-    "experience": number,
-    "education": number,
-    "keywords": number
+    "skills": number (0-100),
+    "experience": number (0-100),
+    "education": number (0-100),
+    "keywords": number (0-100)
   },
-  "atsScore": number,
-  "missingKeywords": [string],
+  "atsScore": number (0-100),
+  "missingKeywords": string[],
   "sectionFeedback": {
-    "skills": [string],
-    "experience": [string],
-    "education": [string]
+    "skills": string[],
+    "experience": string[],
+    "education": string[]
   },
-  "strengths": [string],
-  "weaknesses": [string],
-  "keyChanges": [string],
+  "strengths": string[],
+  "weaknesses": string[],
+  "keyChanges": string[],
   "summary": string
 }
 
-Resume: ${resumeText.substring(0, 10000)}
-Job Description: ${jobDescription.substring(0, 5000)}`;
+IMPORTANT RULES:
+1. Return ONLY the JSON object
+2. Do not include any additional text, explanations, or markdown
+3. Ensure all fields are included
+4. Wrap the JSON in triple backticks (\`\`\`json {...} \`\`\`)
+
+RESUME:
+${resumeText.substring(0, 10000)}
+
+JOB DESCRIPTION:
+${jobDescription.substring(0, 5000)}`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
       
+      console.log("Raw API response:", text);
+      
       const parsed = extractJSON(text);
       
-      if (typeof parsed.matchPercentage !== 'number' || 
-          !Array.isArray(parsed.missingKeywords)) {
-        throw new Error("Invalid analysis format received");
+      // Validate the response structure
+      if (typeof parsed?.matchPercentage !== 'number') {
+        throw new Error("Invalid analysis format received - missing matchPercentage");
       }
       
-      // Ensure all fields exist
-      parsed.scoreBreakdown = parsed.scoreBreakdown || {
-        skills: 0,
-        experience: 0,
-        education: 0,
-        keywords: 0
+      // Ensure all fields exist with defaults
+      const defaultAnalysis = {
+        matchPercentage: 0,
+        scoreBreakdown: {
+          skills: 0,
+          experience: 0,
+          education: 0,
+          keywords: 0
+        },
+        atsScore: 0,
+        missingKeywords: [],
+        sectionFeedback: {
+          skills: [],
+          experience: [],
+          education: []
+        },
+        strengths: [],
+        weaknesses: [],
+        keyChanges: [],
+        summary: "No summary available"
       };
-      parsed.atsScore = parsed.atsScore || 0;
-      parsed.sectionFeedback = parsed.sectionFeedback || {
-        skills: [],
-        experience: [],
-        education: []
-      };
-      parsed.keyChanges = parsed.keyChanges || [];
-      parsed.strengths = parsed.strengths || [];
-      parsed.weaknesses = parsed.weaknesses || [];
-      parsed.summary = parsed.summary || "No summary available";
       
-      setAnalysis(parsed);
+      const completeAnalysis = {...defaultAnalysis, ...parsed};
+      setAnalysis(completeAnalysis);
+      
     } catch (error) {
-      console.error("Analysis error:", error);
-      setApiError(`Analysis failed: ${error.message}`);
+      console.error("Full analysis error:", error);
+      setApiError(`Analysis failed: ${error.message}. Please try again with different content.`);
     } finally {
       setLoading(false);
     }
